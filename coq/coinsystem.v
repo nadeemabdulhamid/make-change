@@ -1,6 +1,7 @@
 
 Require Import List.
 Require Import NPeano EqNat Compare_dec.
+Require Import Omega.
 
 
 (* determine whether given list of numbers is in decreasing order *)
@@ -27,14 +28,18 @@ Definition C : coinlist := 25 :: 6 :: 5 :: 1 :: nil.
 
 Eval compute in decreasing_order C.
 
-Fixpoint repr_value (V : repr) (C : coinlist) : nat :=  (* inner product V . C *)
-  match V, C with
+(* this should follow from decreasing_order and last_is_1
+Definition no_zeroes (C:coinlist) := forallb (fun c:nat => ltb 0 c) C.
+*)
+
+Fixpoint repr_value (C : coinlist) (V : repr) : nat :=  (* inner product V . C *)
+  match C, V with
       | nil, nil => 0
-      | v :: V', c :: C' => (v*c) + repr_value V' C'
+      | c :: C', v :: V' => (c*v) + repr_value C' V'
       | _, _ => 0
   end. 
 
-Eval compute in (beq_nat 38 (repr_value (1 :: 1 :: 0 :: 3 :: nil) (25 :: 10 :: 5 :: 1 :: nil))).
+Eval compute in (beq_nat 38 (repr_value (25 :: 10 :: 5 :: 1 :: nil) (1 :: 1 :: 0 :: 3 :: nil))).
 
 Fixpoint repr_size (A : repr) : nat :=
   match A with
@@ -127,29 +132,88 @@ Fixpoint make_repr_all_ones (n:nat) (v:nat) : repr :=
   end.
 
 (* brute force computations of the minimal and greedy representations *)
-Definition minimal_bf v := best_of more_minimal (make_repr_all_ones N v) (all_reprs C v).
-Definition greedy_bf v :=  best_of repr_gt  (make_repr_all_ones N v) (all_reprs C v).
+Definition minimal_bf C v := best_of more_minimal (make_repr_all_ones (length C) v) (all_reprs C v).
+Definition greedy_bf C v :=  best_of repr_gt  (make_repr_all_ones (length C) v) (all_reprs C v).
 
-Fixpoint greedy_gen (C:coinlist) (v:nat) : repr :=
+Fixpoint greedy (C:coinlist) (v:nat) : repr :=
   match C with
     | nil => nil
     | c :: C' => let q := v / c in
                  let r := v mod c in
-                 q :: greedy_gen C' r
+                 q :: greedy C' r
   end.
-Definition greedy := greedy_gen C.
-  
+(*
+Inductive Greedy : coinlist -> repr -> nat -> Prop :=
+| Greedy_ones : forall v, Greedy (1 :: nil) (v :: nil) v
+| Greedy_cons : forall  ,
+                  Greedy (c :: C) (r :: R) (c * r
+.
+  *)
 Eval compute in (make_repr_all_ones 4 17).
 Eval compute in (more_minimal  (0 :: 1 :: 1 :: 2 :: nil) (0 :: 0 :: 1 :: 12 :: nil)).
 Eval compute in (more_minimal  (1 :: 2 :: 1 :: 0 :: nil) (0 :: 1 :: 1 :: 2 :: nil) ).
 
 Eval compute in 
     let v := 83 in
-    (minimal_bf v , 
-     greedy_bf v, 
-     greedy v).
+    (minimal_bf C v , 
+     greedy_bf C v, 
+     greedy C v).
 
 
+
+
+
+(* =================================================== *)
+(* greedy produces same as greedy_bf *)
+
+Lemma greedy_size_0 : forall C, repr_size (greedy C 0) = 0.
+Proof.
+  intros C; induction C; simpl; auto;
+  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith;
+  case a; simpl; auto with arith.
+Qed.
+
+Lemma greedy_value_0 : forall C, repr_value C (greedy C 0) = 0.
+Proof.
+  intros C; induction C; simpl; auto;
+  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith; 
+  case a; simpl; auto with arith; intros; try omega.
+Qed.
+
+Hint Immediate greedy_value_0 greedy_size_0 : core.
+
+Inductive LastIs1 : coinlist -> Prop :=
+| last1 : LastIs1 (1 :: nil)
+| cons_last1 : forall c C, LastIs1 C -> LastIs1 (c :: C).
+
+Lemma greedy_value : forall C v, (Forall (fun c => 0 < c) C) -> LastIs1 C -> repr_value C (greedy C v) = v.
+Proof.
+  induction C0; simpl; auto.
+  intros v H1 H2; inversion H2.
+  intros v H1 H2.
+  inversion_clear H2; inversion_clear H1; simpl.
+  generalize (divmod_spec v 0 0 0 (le_n _)); elim (divmod v 0 0 0); simpl; intros; omega.
+  unfold div, modulo.
+  revert H0; case a; clear a.
+  intros Habs; inversion Habs.
+  intros n Hlt.
+  generalize (divmod_spec v n 0 n (le_n _)); elim (divmod v n 0 n); simpl;
+  intros q u (H3, H4).
+  pose (IHC0 (n-u) H2 H).
+  rewrite e.
+  replace (q * S n) with (q + n * q); try omega; auto with arith.
+  replace (q * S n) with ((S n) * q); try omega; auto with arith.
+Qed.
+
+(*
+Lemma greedy_step :
+  greedy (c :: C) v = r :: R
+  -> r * c 
+*)
+
+
+
+(* =================================================== *)
 (* Pearson's algorithm to find smallest counterexample *)
 
 Definition targetCvals (C:coinlist) : coinlist :=
@@ -158,7 +222,7 @@ Definition targetCvals (C:coinlist) : coinlist :=
 Eval compute in targetCvals (25 :: 10 :: 5 :: 1 :: nil).
 
 Definition greedy_multi (C:coinlist) (V : list nat) : list repr :=
-  map (greedy_gen C) V.
+  map (greedy C) V.
 
 Eval compute in (greedy_multi C (targetCvals C)).
 
@@ -190,7 +254,7 @@ Definition generate_min_reprs_to_check (Gs : list repr) : list repr :=
 Eval compute in generate_min_reprs_to_check  (greedy_multi C (targetCvals C)).
 
 Definition is_min_lt_greedy_repr (R : repr) : bool :=
-  ltb (repr_size R) (repr_size (greedy (repr_value R C))).
+  ltb (repr_size R) (repr_size (greedy C (repr_value C R))).
 
 
 Fixpoint findp (A:Type) (f: A -> bool) (As : list A) : option A :=
@@ -207,10 +271,11 @@ Definition find_counterexample (C:coinlist) : option nat :=
     | Some R => Some (repr_value C R)
   end.
 
+
 Eval compute in (find_counterexample C).
 
 Eval compute in 
     let v := 10 in
-    (minimal_bf v , 
-     greedy_bf v, 
-     greedy v).
+    (minimal_bf C v , 
+     greedy_bf C v, 
+     greedy C v).
