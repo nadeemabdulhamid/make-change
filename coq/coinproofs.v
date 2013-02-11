@@ -10,16 +10,24 @@ Inductive List_Nth A : list A -> nat -> A -> Prop :=
 | Nth_S : forall a As b n, List_Nth As n b -> List_Nth (a::As) (S n) b
 .
 
-Goal List_Nth (1 :: 2 :: 4 :: 6 :: nil) 2 4.
-Proof.
-  repeat constructor.
-Qed.
+Definition Decreasing_Order ns
+  := forall i j x y , i < j -> List_Nth ns i x -> List_Nth ns j y -> x > y.
+
+Definition Last_Is_1 ns :=  List_Nth ns (pred (length ns)) 1.
+
+Definition Not_Nil (ns:list nat) := ~ (ns = nil).
+
 
 Ltac inversion_on e :=
   match goal with
     | H:e |- _ => inversion H
   end.
 
+
+Goal List_Nth (1 :: 2 :: 4 :: 6 :: nil) 2 4.
+Proof.
+  repeat constructor.
+Qed.
 
 Lemma List_Nth_nil_0 : forall A a i (x:A), List_Nth (a :: nil) i x -> 0 = i.
 Proof.
@@ -76,11 +84,10 @@ Proof.
   apply ltb_lt; omega.
 Qed.
 
-
 Theorem decr_order_mean : 
-  forall ns, true = decreasing_order ns -> 
-             forall i j x y , i < j -> List_Nth ns i x -> List_Nth ns j y -> x > y.
+  forall ns, true = decreasing_order ns -> Decreasing_Order ns.
 Proof.
+  unfold Decreasing_Order.
   induction ns.
   intros; inversion_on (List_Nth nil i x).
   
@@ -104,8 +111,10 @@ Proof.
   omega.
 Qed.
 
-Theorem last_1_List_Nth : forall ns, true = last_is_1 ns -> List_Nth ns (pred (length ns)) 1.
+
+Theorem last_1_List_Nth : forall ns, true = last_is_1 ns -> Last_Is_1 ns.
 Proof.
+  unfold Last_Is_1.
   induction ns.
   simpl; intros H; inversion_on (true = false).
   replace (pred (length (a::ns))) with (length ns); auto.
@@ -125,6 +134,80 @@ Proof.
   revert dependent a; intros a; case a; clear a; auto.
   intros a; case a; clear a; auto.
 Qed.
+
+Theorem last_1_not_nil : forall ns, true = last_is_1 ns -> Not_Nil ns.
+Proof.
+  unfold Not_Nil, not; intros; replace ns with (@nil nat) in *; simpl in *;
+  inversion_on (true = false).
+Qed.
+
+
+
+(* =================================================== *)
+
+
+Lemma greedy_size_0 : forall C, repr_size (greedy C 0) = 0.
+Proof.
+  intros C; induction C; simpl; auto;
+  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith;
+  case a; simpl; auto with arith.
+Qed.
+
+Lemma greedy_value_0 : forall C, repr_value C (greedy C 0) = 0.
+Proof.
+  intros C; induction C; simpl; auto;
+  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith; 
+  case a; simpl; auto with arith; intros; try omega.
+Qed.
+
+Hint Immediate greedy_value_0 greedy_size_0 : core.
+
+Lemma greedy_value : 
+  forall C v, Not_Nil C -> Decreasing_Order C -> Last_Is_1 C -> repr_value C (greedy C v) = v.
+Proof.
+  induction C.
+  simpl; intros; absurd (Not_Nil nil); auto.
+  rename a into c; intros v Hnil Hdecr Hlast1.
+  revert dependent C.
+  intros C; case C; clear C.
+
+
+  Focus 2.
+  intros c' C'.
+  remember (c' :: C') as C.
+  intros IHC Hnil Hdecr Hlast1.
+  simpl; rewrite IHC; auto.
+  symmetry; apply Nat.div_mod.
+  intros Habs; replace c with 0 in *.
+
+Lemma Decr_Last_1_not_0 : forall C, Decreasing_Order (0 :: C) -> Last_Is_1 (0 :: C) -> False.
+Proof.
+  intros C Hdecr Hlast1.
+  unfold Decreasing_Order, Last_Is_1 in *.
+  absurd (0 > 1); auto with arith.
+  apply (Hdecr 0 (length C) 0 1); auto.
+  replace (pred (length (0::C))) with (length C) in Hlast1; auto.
+  revert dependent C.
+  intros C; case C; clear C.
+  intros Hdecr Hlast1.
+  simpl in Hlast1.
+  absurd (0 = 1); auto.
+  eapply List_Nth_0; eauto.
+  simpl; auto with arith.
+  constructor.
+Qed.  
+
+  eapply Decr_Last_1_not_0; eauto.
+  rewrite HeqC; unfold Not_Nil; discriminate.
+  
+
+  
+
+  
+
+
+Qed.
+
 
 
 
