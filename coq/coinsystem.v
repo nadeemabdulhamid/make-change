@@ -8,8 +8,11 @@ Require Import Omega.
 Fixpoint decreasing_order (ns : list nat) : bool :=
   match ns with
       | nil => true
-      | _ :: nil => true
-      | a :: b :: ns' =>  andb (ltb b a) (decreasing_order ns')
+      | a :: ns' => andb (match ns' with
+                            | nil => true
+                            | b :: _ => ltb b a
+                          end)
+                         (decreasing_order ns')
   end.
 
 Fixpoint last_is_1 (ns : list nat) : bool :=
@@ -142,13 +145,46 @@ Fixpoint greedy (C:coinlist) (v:nat) : repr :=
                  let r := v mod c in
                  q :: greedy C' r
   end.
-(*
+
 Inductive Greedy : coinlist -> repr -> nat -> Prop :=
 | Greedy_ones : forall v, Greedy (1 :: nil) (v :: nil) v
-| Greedy_cons : forall  ,
-                  Greedy (c :: C) (r :: R) (c * r
+| Greedy_cons : forall  c C r R v,
+                  v < c -> 
+                  Greedy C R v ->
+                  Greedy (c :: C) (r :: R) (c * r + v)
 .
-  *)
+
+Inductive ReprValue : coinlist -> repr -> nat -> Prop :=
+| ReprValue_ones : forall v, ReprValue (1 :: nil) (v :: nil) v
+| ReprValue_cons : forall c C C' r R R' v v',
+                     ReprValue C R v ->
+                     C' = c :: C -> R' = r :: R -> v' = c*r + v ->
+                     ReprValue C' R' v'
+.
+
+Inductive LastIs1 : coinlist -> Prop :=
+| last1 : LastIs1 (1 :: nil)
+| cons_last1 : forall c C, LastIs1 C -> LastIs1 (c :: C).
+
+Lemma greedy_Greedy : forall C v, (Forall (fun c => 0 < c) C) -> LastIs1 C -> Greedy C (greedy C v) v.
+Proof.
+  induction C0.
+  intros v H1 H2; inversion H2.
+  intros v H1; inversion_clear H1;  intros H2; revert H0; inversion_clear H2; intros H3.
+  unfold greedy.
+  replace (v / 1) with v.
+  constructor.
+  unfold div; generalize (divmod_spec v 0 0 0 (le_n _)); elim (divmod v 0 0 0); simpl; intros; omega.
+  simpl; unfold div.
+  revert H; case a; simpl.
+  intros; absurd (0 < 0); auto with arith.
+  clear a; intros a H.
+  generalize (divmod_spec v a 0 a (le_n _)); elim (divmod v a 0 a); simpl; intros q u (H1, H2).
+  replace v with (q + a * q + (a - u)); try omega.
+  constructor; auto; omega.
+Qed.
+
+
 Eval compute in (make_repr_all_ones 4 17).
 Eval compute in (more_minimal  (0 :: 1 :: 1 :: 2 :: nil) (0 :: 0 :: 1 :: 12 :: nil)).
 Eval compute in (more_minimal  (1 :: 2 :: 1 :: 0 :: nil) (0 :: 1 :: 1 :: 2 :: nil) ).
@@ -182,10 +218,6 @@ Qed.
 
 Hint Immediate greedy_value_0 greedy_size_0 : core.
 
-Inductive LastIs1 : coinlist -> Prop :=
-| last1 : LastIs1 (1 :: nil)
-| cons_last1 : forall c C, LastIs1 C -> LastIs1 (c :: C).
-
 Lemma greedy_value : forall C v, (Forall (fun c => 0 < c) C) -> LastIs1 C -> repr_value C (greedy C v) = v.
 Proof.
   induction C0; simpl; auto.
@@ -205,11 +237,39 @@ Proof.
   replace (q * S n) with ((S n) * q); try omega; auto with arith.
 Qed.
 
+Inductive ReprGE : repr -> repr -> Prop :=
+| ReprGE_nil : ReprGE nil nil
+| ReprGE_eq  : forall v R R', ReprGE R R' -> ReprGE (v :: R) (v :: R')
+| ReprGE_gt  : forall v v' R R', v' < v -> ReprGE (v :: R) (v' :: R')
+.
+
 (*
-Lemma greedy_step :
-  greedy (c :: C) v = r :: R
-  -> r * c 
-*)
+Lemma Greedy_lt: forall c C r R r' R' v,
+                   Greedy (c::C) (r::R) v -> ReprValue (c::C) (r'::R') v -> r=r' \/ r>r'.
+Proof.
+  intros c C r R r' R' v HG.
+  inversion_clear HG.
+  intros HR.
+  inversion_clear HR; auto.
+  inversion H0.
+  inversion H1.
+  replace c0 with 1 in H2; replace r0 with r' in H2; replace r0 with r'; rewrite H2.
+  case v0.
+  left; auto with arith; omega.
+  right; omega.
+
+  remember (c*r + v0) as n.
+  intros HR; revert H0.
+  inversion HR. intros Habs.
+  inversion Habs.
+
+  intros HG.
+  
+  
+  
+
+Qed.*)
+
 
 
 
