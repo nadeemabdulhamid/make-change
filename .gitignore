@@ -1,2 +1,6 @@
 *.glob
 *.vo
+*.aux
+*.log
+*.gz
+*.pdf
