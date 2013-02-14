@@ -5,3 +5,5 @@
 *.gz
 *.pdf
 *.texshop
+*.blg
+*.bbl

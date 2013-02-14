@@ -23,19 +23,47 @@ Brook Bowers\\
 blah blah
 \end{abstract}
 
-% A category with the (minimum) three required fields
-\category{F.3.1}{Specifying and Verifying and Reasoning about Programs}{Mechanical verification}
-%A category including the fourth, optional field follows...
 \category{D.2.4}{Software/Program Verification}{Correctness proofs}
+\category{F.3.1}{Specifying and Verifying and Reasoning about Programs}{Mechanical verification}
 
-\terms{VERIFICATION}
+\terms{Verification}
 
 \keywords{change making, formal methods, Coq proof assistant} % NOT required for Proceedings
 
-\input{intro.tex}
+\section{Introduction}
+
+The \emph{change making problem} poses the task of determining how to represent a given value using the fewest coins from a given set of denominations. Formally, given a value $k$ and a finite set of positive integers, $c_1 > c_2 > \ldots > c_n$ (called a \emph{coin system}), where $c_n = 1$, we wish to find a sequence of nonnegative integer coefficients, $x_i,\ 1 \le i \le n$ (called a \emph{representation} of $k$) such that the size of the representation,
+\[ \sum_{i=1}^{n}x_i \]
+is minimized, subject to,
+\[ k = \sum_{i=1}^{n}{x_i c_i}\ . \]
+
+Change making is a variation of the general knapsack problem in which the number of items (coins) available is unbounded and the goal is to minimize the total number of items selected to fit in the ``knapsack'' (with capacity represented by the target value). In the general case, determining the optimal solution to the change making problem is \emph{NP}-hard~\cite{?}. Nonetheless, for particular coin systems (including almost all coin systems in use around the world), the problem can be efficiently solved using a greedy algorithm. For instances where the greedy algorithm does not produce an optimal solution, a dynamic programming algorithm may be used instead (which always produces an optimal solution, but has higher computational complexity).
+
+
+\section{Change Making Algorithms}
+
+The greedy algorithm for the change making problem proceeds by repeatedly choosing to include the largest coin less than or equal to the amount remaining at a given stage of the process. As noted, for some coin systems the greedy algorithm always produces an optimal representation for any given value - such coin systems are called \emph{canonical}~\cite{?}. However, it is easy to construct a coin system for which the greedy algorithm fails to produce an optimal representation for a particular value. An interesting question, therefore, is whether there is a way to determine if an arbitrary coin system is canonical. Since there are infinitely many values of $k$ to test for a given coin system, it is not immediately evident that a finite process exists to do so. A progression of results~\cite{?,?,?} has shown that, in fact, it is possible to determine canonicity (ultimately in time polynomial to the number of coins in the system) by examining a finite number of possible counterexamples. 
+
+Since the change making problem exhibits an optimal substructure property, it is always possible to use dynamic programming to obtain an optimal solution for any coin system and value. The dynamic programming algorithm is straightforward, running in time $\mathcal{O}(nk)$ with space requirement in $\mathcal{O}(n)$. 
+
+Our goal in this project has been to develop formally verified implementations of the greedy and dynamic programming algorithms for the change making problem. In the sections that follow, we describe our programming and reasoning environment and outline the stages of our formalization. 
+
+
+\section{Programming and Reasoning Environment}
+Our formal developments are  carried out using the Coq proof assistant~\cite{coq09}. The Coq system is based on 
+the Calculus of Inductive Constructions (CIC)~\cite{paulin93}, a higher-order typed lambda calculus with dependent types and inductive definitions. It provides a uniform framework for use  both as a functional programming language and a higher-order logic for reasoning. In order for the logical system to remain consistent, certain constraints are imposed on the structure of data  and functions that can be defined in the language. For example, only terminating recursion can be expressed and all functions must be total. The ramifications of this from a programming perspective are that the language is not Turing-complete; one cannot write a non-terminating function in it. Nonetheless, since algorithms, by definition, must terminate, it is possible (in theory at least) to implement many interesting algorithms in Coq and prove properties about their behavior. 
+
+
+\section{Formalization}
 
 
 
+\section{Conclusion}
+
+
+
+\bibliographystyle{abbrv}
+\bibliography{paper}  % the name of the Bibliography in this case
 
 
 \end{document}
