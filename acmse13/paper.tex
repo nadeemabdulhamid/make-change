@@ -46,15 +46,18 @@ The greedy algorithm for the change making problem proceeds by repeatedly choosi
 
 Since the change making problem exhibits an optimal substructure property, it is always possible to use dynamic programming to obtain an optimal solution for any coin system and value. The dynamic programming algorithm is straightforward, running in time $\mathcal{O}(nk)$ with space requirement in $\mathcal{O}(n)$. 
 
+
+\section{Formalization}
+
 Our goal in this project has been to develop formally verified implementations of the greedy and dynamic programming algorithms for the change making problem. In the sections that follow, we describe our programming and reasoning environment and outline the stages of our formalization. 
 
-
-\section{Programming and Reasoning Environment}
+\subsection{Coq Proof Assistant}
 Our formal developments are  carried out using the Coq proof assistant~\cite{coq09}. The Coq system is based on 
 the Calculus of Inductive Constructions (CIC)~\cite{paulin93}, a higher-order typed lambda calculus with dependent types and inductive definitions. It provides a uniform framework for use  both as a functional programming language and a higher-order logic for reasoning. In order for the logical system to remain consistent, certain constraints are imposed on the structure of data  and functions that can be defined in the language. For example, only terminating recursion can be expressed and all functions must be total. The ramifications of this from a programming perspective are that the language is not Turing-complete; one cannot write a non-terminating function in it. Nonetheless, since algorithms, by definition, must terminate, it is possible (in theory at least) to implement many interesting algorithms in Coq and prove properties about their behavior. 
 
 
-\section{Formalization}
+
+
 
 
 
