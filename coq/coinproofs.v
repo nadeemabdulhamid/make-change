@@ -46,6 +46,9 @@ Definition ReprLt V1 V2
 
 Definition ReprGt V1 V2 := ReprLt V2 V1.
 
+Definition Lexic_Gtest C V
+  := forall v, ReprValue C V v -> forall V', ReprValue C V' v -> ReprGt V V' \/ V = V'.
+
 
 (* ================================================================ *)
 
@@ -301,14 +304,23 @@ Proof.
   rewrite HeqC in *; apply LastIs1_rest with c; auto.
 Qed.
 
+Lemma ReprValue_1 :
+  forall v v', ReprValue (1 :: nil) (v :: nil) v' -> v' = v.
+Proof.
+  intros v v' H.
+  inversion_on (ReprValue (1 :: nil) (v :: nil) v').
+  inversion_on (ReprValue nil nil s).
+  omega.
+Qed.
+
 Lemma greedy_ReprValue : 
-  forall C v, NotNil C -> DecreasingOrder C -> LastIs1 C -> ReprValue C (greedy C v) v.
+  forall C v v', NotNil C -> DecreasingOrder C -> LastIs1 C -> ReprValue C (greedy C v) v' -> v = v'.
 Proof.
   induction C.
 
   (* C = nil *)
   simpl; intros; absurd (NotNil nil); auto.
-  rename a into c; intros v Hnil Hdecr Hlast1.
+  rename a into c; intros v v' Hnil Hdecr Hlast1.
   revert dependent C.
   intros C; case C; clear C.
  
@@ -316,21 +328,24 @@ Proof.
   intros IHC Hnil Hdecr Hlast1.
   simpl.
   replace c with 1; try symmetry; auto.
-  replace (v/1) with v; try (symmetry; apply Nat.div_1_r).
-  apply ReprValue_cons with 0; eauto.
-  simpl; omega.
+  replace (v/1) with v in *; try (symmetry; apply Nat.div_1_r).
+  apply ReprValue_1; auto.
 
   (* C = c' :: C' *)
   intros c' C'.
   remember (c' :: C') as C.
-  intros IHC Hnil Hdecr Hlast1.
-  simpl; apply ReprValue_cons with (v mod c).
-  apply IHC; auto.
+  intros IHC Hnil Hdecr Hlast1 Hrepr; simpl in *.
+  
+  inversion Hrepr.
+  assert (NotNil C /\ DecreasingOrder C /\ LastIs1 C) as (HnilC, (HdecrC, Hlast1C));
+    [repeat split; eauto | idtac].
   rewrite HeqC; discriminate.
-  apply DecreasingOrder_rest with c; auto.
   rewrite HeqC in *; apply LastIs1_rest with c; auto.
-  symmetry; apply div_mod.
-  intros Habs; replace c with 0 in *.
+  generalize (IHC _ _ HnilC HdecrC Hlast1C H4); intros Heq.
+  rewrite <- Heq in *.
+  rewrite <- H5.
+  apply Nat.div_mod.
+  intros Habs; rewrite Habs in *.
   eapply DecrLast1_not0; eauto.
 Qed.
 
@@ -410,10 +425,11 @@ Proof.
   intros Heq; rewrite Heq; right; auto.
 Qed.
 
-
-
-
-
-
-
-
+Theorem greedy_Lexic_Ctest :
+  forall C v, NotNil C -> DecreasingOrder C -> LastIs1 C -> Lexic_Gtest C (greedy C v).
+Proof.
+  intros C v Hnil Hdecr Hlast1.
+  intros v' Hrepr V' Hrepr'.
+  apply greedy_ReprGt; auto.
+  replace v with v'; auto; symmetry; apply greedy_ReprValue with C; auto.
+Qed.  
