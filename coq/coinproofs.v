@@ -5,18 +5,49 @@ Require Import Omega.
 
 Set Implicit Arguments.
 
-Inductive List_Nth A : list A -> nat -> A -> Prop :=
-| Nth_0 : forall a As, List_Nth (a::As) 0 a
-| Nth_S : forall a As b n, List_Nth As n b -> List_Nth (a::As) (S n) b
+Inductive ListNth A : list A -> nat -> A -> Prop :=
+| Nth_0 : forall a As, ListNth (a::As) 0 a
+| Nth_S : forall a As b n, ListNth As n b -> ListNth (a::As) (S n) b
 .
 
-Definition Decreasing_Order ns
-  := forall i j x y , i < j -> List_Nth ns i x -> List_Nth ns j y -> x > y.
+Definition DecreasingOrder ns
+  := forall i j x y , i < j -> ListNth ns i x -> ListNth ns j y -> x > y.
 
-Definition Last_Is_1 ns :=  List_Nth ns (pred (length ns)) 1.
+Definition LastIs1 ns :=  ListNth ns (pred (length ns)) 1.
 
-Definition Not_Nil (ns:list nat) := ~ (ns = nil).
+Definition NotNil (ns:list nat) := ~ (ns = nil).
 
+Inductive ReprValue : coinlist -> repr -> nat -> Prop :=
+| ReprValue_nil : ReprValue nil nil 0
+| ReprValue_cons : forall c C v V s t, 
+                   ReprValue C V s ->
+                   (c*v) + s = t ->
+                   ReprValue (c::C) (v::V) t.
+
+Inductive ReprSize : repr -> nat -> Prop :=
+| ReprSize_nil : ReprSize nil 0
+| ReprSize_cons : forall v V n' n,
+                    ReprSize V n' ->
+                    n = v + n' ->
+                    ReprSize (v::V) n.
+
+Hint Constructors ReprValue ReprSize : core.
+
+(* V1 < V2 --> 
+    V1 = (a1, a2, ... aj, ....)
+    V2 = (b1, b2, ... bj, ....)
+  where a1=b1 ... aj-1=bj-1 and aj<bj *)
+Definition ReprLt V1 V2
+  := exists j v1 v2,
+       ListNth V1 j v1
+       /\ ListNth V2 j v2
+       /\ v1 < v2
+       /\ (forall i x y, i < j -> ListNth V1 i x -> ListNth V2 i y -> x = y).
+
+Definition ReprGt V1 V2 := ReprLt V2 V1.
+
+
+(* ================================================================ *)
 
 Ltac inversion_on e :=
   match goal with
@@ -24,52 +55,52 @@ Ltac inversion_on e :=
   end.
 
 
-Goal List_Nth (1 :: 2 :: 4 :: 6 :: nil) 2 4.
+Goal ListNth (1 :: 2 :: 4 :: 6 :: nil) 2 4.
 Proof.
   repeat constructor.
 Qed.
 
-Lemma List_Nth_nil_0 : forall A a i (x:A), List_Nth (a :: nil) i x -> 0 = i.
+Lemma ListNth_nil_0 : forall A a i (x:A), ListNth (a :: nil) i x -> 0 = i.
 Proof.
-  intros; inversion_on (List_Nth (a :: nil) i x); auto.
-  inversion_on (List_Nth nil n x).
+  intros; inversion_on (ListNth (a :: nil) i x); auto.
+  inversion_on (ListNth nil n x).
 Qed.
 
-Lemma List_Nth_nil_x : forall A a i (x:A), List_Nth (a :: nil) i x -> a = x.
+Lemma ListNth_nil_x : forall A a i (x:A), ListNth (a :: nil) i x -> a = x.
 Proof.
-  intros; inversion_on (List_Nth (a :: nil) i x); auto.
-  inversion_on (List_Nth nil n x).
+  intros; inversion_on (ListNth (a :: nil) i x); auto.
+  inversion_on (ListNth nil n x).
 Qed.
  
-Lemma List_Nth_0 : forall A n ns (x:A), List_Nth (n::ns) 0 x -> n = x.
+Lemma ListNth_0 : forall A n ns (x:A), ListNth (n::ns) 0 x -> n = x.
 Proof.
-  intros; inversion_on (List_Nth (n::ns) 0 x); auto.
+  intros; inversion_on (ListNth (n::ns) 0 x); auto.
 Qed.
 
-Lemma List_Nth_S : forall A n ns i (x:A), List_Nth (n::ns) (S i) x -> List_Nth ns i x.
+Lemma ListNth_S : forall A n ns i (x:A), ListNth (n::ns) (S i) x -> ListNth ns i x.
 Proof.
-  intros; inversion_on (List_Nth (n::ns) (S i) x); auto.
+  intros; inversion_on (ListNth (n::ns) (S i) x); auto.
 Qed.
 
 
-Hint Immediate List_Nth_nil_0 List_Nth_nil_x List_Nth_0 List_Nth_S : core.
+Hint Immediate ListNth_nil_0 ListNth_nil_x ListNth_0 ListNth_S : core.
 
 Lemma decr_order_smaller_than :
   forall i n ns, true = decreasing_order (n::ns) ->
-               forall x, List_Nth ns i x -> n > x.
+               forall x, ListNth ns i x -> n > x.
 Proof.
   induction i.
   intros n ns; case ns; simpl.
-  intros; inversion_on (List_Nth nil 0 x).
+  intros; inversion_on (ListNth nil 0 x).
   clear ns; intros n' ns Hdecr x Lnth.
   replace x with n' in *; eauto.
   apply ltb_lt.
   elim (andb_true_eq _ _ Hdecr); auto.
 
   intros n ns; case ns; simpl.
-  intros; inversion_on (List_Nth nil (S i) x).
+  intros; inversion_on (ListNth nil (S i) x).
   clear ns; intros n' ns'; case ns'; clear ns'.
-  intros; inversion_on (List_Nth (n'::nil) (S i) x); inversion_on (List_Nth nil i x); simpl.
+  intros; inversion_on (ListNth (n'::nil) (S i) x); inversion_on (ListNth nil i x); simpl.
   intros n'' ns Hdecr x Lnth.
   elim (andb_true_eq _ _ Hdecr); clear Hdecr; intros H1 H2.  
   elim (andb_true_eq _ _ H2); clear H2; intros H2 H3.
@@ -84,12 +115,12 @@ Proof.
   apply ltb_lt; omega.
 Qed.
 
-Theorem decr_order_mean : 
-  forall ns, true = decreasing_order ns -> Decreasing_Order ns.
+Theorem decr_order_correct : 
+  forall ns, decreasing_order ns = true -> DecreasingOrder ns.
 Proof.
-  unfold Decreasing_Order.
+  unfold DecreasingOrder.
   induction ns.
-  intros; inversion_on (List_Nth nil i x).
+  intros; inversion_on (ListNth nil i x).
   
   revert IHns; case ns; simpl; intros.
   replace i with 0 in *; replace j with 0 in *; eauto; inversion_on (0 < 0).
@@ -104,17 +135,50 @@ Proof.
   replace x with a; [idtac | eauto].
   apply decr_order_smaller_than with j' (n::l); auto.
   intros i' Hij H2.
-  assert (List_Nth (n::l) i' x).
+  assert (ListNth (n::l) i' x).
   inversion H2; auto.
-  elim (andb_true_eq _ _ H); intros H4 H5; clear H.
+  symmetry in H; elim (andb_true_eq _ _ H); intros H4 H5; clear H.
   apply IHns with i' j'; eauto.
   omega.
 Qed.
 
-
-Theorem last_1_List_Nth : forall ns, true = last_is_1 ns -> Last_Is_1 ns.
+Lemma DecreasingOrder_rest : forall n ns, DecreasingOrder (n::ns) -> DecreasingOrder ns.
 Proof.
-  unfold Last_Is_1.
+  unfold DecreasingOrder.
+  intros n ns H i j x y H0 H1 H2.
+  apply H with (S i) (S j); auto with arith;
+  constructor; auto.
+Qed.
+
+Theorem decr_order_complete :
+  forall ns, DecreasingOrder ns -> decreasing_order ns = true.
+Proof.
+  induction ns; simpl; auto.
+  revert IHns; case ns; auto.
+  clear ns; intros n ns IHns H.
+  apply andb_true_intro; split; auto.
+  unfold DecreasingOrder in H.
+  apply ltb_lt; apply H with 0 1; auto;
+  repeat constructor.
+  apply IHns.
+  apply DecreasingOrder_rest with a; auto.
+Qed.
+
+Hint Immediate decr_order_correct decr_order_complete DecreasingOrder_rest : core.
+
+Lemma decr_order_rest :
+  forall n ns, decreasing_order (n::ns) = true -> decreasing_order ns = true.
+Proof.
+  intros n ns H.
+  assert (DecreasingOrder ns); auto.
+  apply DecreasingOrder_rest with n; auto.
+Qed.
+
+Hint Immediate decr_order_rest : core.
+
+Theorem last_1_correct : forall ns, true = last_is_1 ns -> LastIs1 ns.
+Proof.
+  unfold LastIs1.
   induction ns.
   simpl; intros H; inversion_on (true = false).
   replace (pred (length (a::ns))) with (length ns); auto.
@@ -135,55 +199,16 @@ Proof.
   intros a; case a; clear a; auto.
 Qed.
 
-Theorem last_1_not_nil : forall ns, true = last_is_1 ns -> Not_Nil ns.
+Theorem last_1_not_nil : forall ns, true = last_is_1 ns -> NotNil ns.
 Proof.
-  unfold Not_Nil, not; intros; replace ns with (@nil nat) in *; simpl in *;
+  unfold NotNil, not; intros; replace ns with (@nil nat) in *; simpl in *;
   inversion_on (true = false).
 Qed.
 
-
-
-(* =================================================== *)
-
-
-Lemma greedy_size_0 : forall C, repr_size (greedy C 0) = 0.
-Proof.
-  intros C; induction C; simpl; auto;
-  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith;
-  case a; simpl; auto with arith.
-Qed.
-
-Lemma greedy_value_0 : forall C, repr_value C (greedy C 0) = 0.
-Proof.
-  intros C; induction C; simpl; auto;
-  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith; 
-  case a; simpl; auto with arith; intros; try omega.
-Qed.
-
-Hint Immediate greedy_value_0 greedy_size_0 : core.
-
-Lemma greedy_value : 
-  forall C v, Not_Nil C -> Decreasing_Order C -> Last_Is_1 C -> repr_value C (greedy C v) = v.
-Proof.
-  induction C.
-  simpl; intros; absurd (Not_Nil nil); auto.
-  rename a into c; intros v Hnil Hdecr Hlast1.
-  revert dependent C.
-  intros C; case C; clear C.
-
-
-  Focus 2.
-  intros c' C'.
-  remember (c' :: C') as C.
-  intros IHC Hnil Hdecr Hlast1.
-  simpl; rewrite IHC; auto.
-  symmetry; apply Nat.div_mod.
-  intros Habs; replace c with 0 in *.
-
-Lemma Decr_Last_1_not_0 : forall C, Decreasing_Order (0 :: C) -> Last_Is_1 (0 :: C) -> False.
+Lemma DecrLast1_not0 : forall C, DecreasingOrder (0 :: C) -> LastIs1 (0 :: C) -> False.
 Proof.
   intros C Hdecr Hlast1.
-  unfold Decreasing_Order, Last_Is_1 in *.
+  unfold DecreasingOrder, LastIs1 in *.
   absurd (0 > 1); auto with arith.
   apply (Hdecr 0 (length C) 0 1); auto.
   replace (pred (length (0::C))) with (length C) in Hlast1; auto.
@@ -192,21 +217,199 @@ Proof.
   intros Hdecr Hlast1.
   simpl in Hlast1.
   absurd (0 = 1); auto.
-  eapply List_Nth_0; eauto.
+  eapply ListNth_0; eauto.
   simpl; auto with arith.
   constructor.
 Qed.  
 
-  eapply Decr_Last_1_not_0; eauto.
-  rewrite HeqC; unfold Not_Nil; discriminate.
-  
-
-  
-
-  
-
-
+Lemma LastIs1_rest : forall n n' ns, LastIs1 (n::n'::ns) -> LastIs1 (n'::ns).
+Proof.
+  intros n n' ns H.
+  unfold LastIs1 in *.
+  inversion H; auto.
 Qed.
+
+Lemma LastIs1_nil : forall c, LastIs1 (c::nil) -> c = 1.
+Proof.
+  intros c H.
+  inversion H; auto.
+Qed.
+
+Hint Immediate LastIs1_nil : core.
+
+
+(* =================================================== *)
+
+Lemma greedy_size_0 : forall C, repr_size (greedy C 0) = 0.
+Proof.
+  intros C; induction C; simpl; auto;
+  replace (0 mod a) with 0; [ rewrite IHC; replace (0 / a) with 0 | idtac ]; auto with arith;
+  case a; simpl; auto with arith.
+Qed.
+
+Lemma greedy_ReprSize_0 : forall C, DecreasingOrder C -> LastIs1 C -> ReprSize (greedy C 0) 0.
+Proof.
+  intros C; induction C; simpl; auto; try constructor.
+  revert IHC.
+  case C; clear C; [intros IHC Hdecr Hlast1 | intros c C IHC Hdecr Hlast1].
+
+  inversion_clear Hlast1.
+  simpl; eauto.
+  
+  assert (a<>0).
+  intros Habs; rewrite Habs in *; eapply DecrLast1_not0; eauto.
+  replace (0 / a) with 0; try (symmetry; apply Nat.div_0_l); auto.
+  replace (0 mod a) with 0; try (symmetry; apply Nat.mod_0_l); auto.
+  apply ReprSize_cons with 0; auto with arith.
+  apply IHC.
+  eapply DecreasingOrder_rest; eauto.
+  eapply LastIs1_rest; eauto.
+Qed.
+
+Hint Immediate greedy_size_0 greedy_ReprSize_0 : core.
+
+Lemma greedy_repr_value : 
+  forall C v, NotNil C -> DecreasingOrder C -> LastIs1 C -> repr_value C (greedy C v) = v.
+Proof.
+  induction C.
+
+  (* C = nil *)
+  simpl; intros; absurd (NotNil nil); auto.
+  rename a into c; intros v Hnil Hdecr Hlast1.
+  revert dependent C.
+  intros C; case C; clear C.
+
+  (* C = 1 :: nil *)  
+  intros IHC Hnil Hdecr Hlast1.
+  simpl.
+  replace c with 1; symmetry; auto.
+  replace (1 * (v / 1) + 0) with (1 * (v /1)); auto with arith.
+  replace (1 * (v / 1)) with (v / 1); auto with arith.
+  symmetry; apply Nat.div_1_r.
+
+  (* C = c' :: C' *)
+  intros c' C'.
+  remember (c' :: C') as C.
+  intros IHC Hnil Hdecr Hlast1.
+  simpl; rewrite IHC; auto.
+  symmetry; apply Nat.div_mod.
+  intros Habs; replace c with 0 in *.
+
+  eapply DecrLast1_not0; eauto.
+  rewrite HeqC; unfold NotNil; discriminate.
+  apply DecreasingOrder_rest with c; auto.
+  rewrite HeqC in *; apply LastIs1_rest with c; auto.
+Qed.
+
+Lemma greedy_ReprValue : 
+  forall C v, NotNil C -> DecreasingOrder C -> LastIs1 C -> ReprValue C (greedy C v) v.
+Proof.
+  induction C.
+
+  (* C = nil *)
+  simpl; intros; absurd (NotNil nil); auto.
+  rename a into c; intros v Hnil Hdecr Hlast1.
+  revert dependent C.
+  intros C; case C; clear C.
+ 
+  (* C = 1 :: nil *)  
+  intros IHC Hnil Hdecr Hlast1.
+  simpl.
+  replace c with 1; try symmetry; auto.
+  replace (v/1) with v; try (symmetry; apply Nat.div_1_r).
+  apply ReprValue_cons with 0; eauto.
+  simpl; omega.
+
+  (* C = c' :: C' *)
+  intros c' C'.
+  remember (c' :: C') as C.
+  intros IHC Hnil Hdecr Hlast1.
+  simpl; apply ReprValue_cons with (v mod c).
+  apply IHC; auto.
+  rewrite HeqC; discriminate.
+  apply DecreasingOrder_rest with c; auto.
+  rewrite HeqC in *; apply LastIs1_rest with c; auto.
+  symmetry; apply div_mod.
+  intros Habs; replace c with 0 in *.
+  eapply DecrLast1_not0; eauto.
+Qed.
+
+Lemma greedy_ReprGt :
+  forall C v V, NotNil C -> DecreasingOrder C -> LastIs1 C -> ReprValue C V v
+                 -> (ReprGt (greedy C v) V) \/ (greedy C v = V).
+Proof.
+  induction C.
+  simpl; intros; absurd (NotNil nil); auto.
+
+  (* C = nil *)
+  rename a into c; intros v V Hnil Hdecr Hlast1.
+  revert dependent C.
+  intros C; case C; clear C.
+
+  (* 1 :: nil *)
+  Focus 1.
+  intros IHC Hnil Hdecr Hlast1 .
+  replace c with 1; try symmetry; auto.
+  unfold greedy, repr_value.
+  replace (v / 1) with v ; [idtac | symmetry; apply Nat.div_1_r].
+  intros Hrepr.
+  right.
+  inversion_clear Hrepr.
+  revert H0.
+  inversion_clear H; intros.
+  replace v0 with v; auto; omega.
+
+  (* C = c' :: C' *)
+  intros c' C'.
+  remember (c' :: C') as C.
+  intros IHC Hnil Hdecr Hlast1 Hrepr; simpl.
+  assert (c <> 0) as Hc0.
+  intros Habs; rewrite Habs in *; eapply DecrLast1_not0; eauto.
+  inversion_clear Hrepr.
+  rewrite <- H0.
+  clear v H0.
+
+  replace (c * v0) with (v0 * c); auto with arith.
+  rewrite Nat.div_add_l; auto.
+  replace (v0 * c + s) with (s + v0 * c); auto with arith.
+  rewrite Nat.mod_add; auto.
+
+  assert (c <= s \/ s < c) as Hor; [omega | inversion_clear Hor].
+  assert (0 < s / c) as Hsc; [ apply Nat.div_str_pos; omega | idtac ].
+  left.
+  unfold ReprGt, ReprLt.
+  exists 0; exists v0; exists (v0 + s / c).
+  repeat (split; repeat constructor; auto).
+  omega.
+  intros i x y Habs; omega.
+
+  rewrite Nat.div_small; auto.
+  rewrite Nat.mod_small; auto. 
+  replace (v0 + 0) with v0; auto with arith.
+  case (IHC s V0); eauto.
+  rewrite HeqC; unfold NotNil; discriminate.
+  rewrite HeqC in *; eapply LastIs1_rest; eauto.
+  clear IHC.
+
+  Focus 1.
+  intros (j, (v1, (v2, (HL1, (HL2, (Hv12, Hi)))))).
+  left.
+  exists (S j); exists v1; exists v2.
+  repeat split; try constructor; auto.
+  intros i; case i; clear i.
+  intros x y Hlt Hl1 Hl2.
+  inversion_on (ListNth (v0::V0) 0 x).
+  inversion_on (ListNth (v0 :: greedy C s) 0 y).
+  omega.
+
+  intros i' x y HltS Hl1 Hl2.
+  apply Hi with i'; auto with arith.
+  inversion Hl1; auto.
+  inversion Hl2; auto.
+  
+  intros Heq; rewrite Heq; right; auto.
+Qed.
+
 
 
 
