@@ -46,9 +46,23 @@ Definition ReprLt V1 V2
 
 Definition ReprGt V1 V2 := ReprLt V2 V1.
 
+(* ReprSum V U D ->  V = U + D *)
+Inductive ReprSum : repr -> repr -> repr -> Prop :=
+| ReprSum_nil : ReprSum nil nil nil
+| ReprSum_cons : forall v V' u U' d D',
+                   ReprSum V' U' D' ->
+                   v = u + d ->
+                   ReprSum (v::V') (u::U') (d::D').
+
 Definition Lexic_Gtest C V
   := forall v, ReprValue C V v -> forall V', ReprValue C V' v -> ReprGt V V' \/ V = V'.
 
+Definition Minimal C V
+  := forall v s, ReprValue C V v -> ReprSize V s
+                 -> forall V' s', ReprValue C V' v -> ReprSize V' s' -> s <= s'.
+
+Definition Canonical C
+  := forall V, Lexic_Gtest C V <-> Minimal C V.
 
 (* ================================================================ *)
 
@@ -433,3 +447,85 @@ Proof.
   apply greedy_ReprGt; auto.
   replace v with v'; auto; symmetry; apply greedy_ReprValue with C; auto.
 Qed.  
+
+Lemma ReprLt_cons_inv :
+  forall a A b B, ReprLt (a::A) (b::B) -> a < b \/ (a = b /\ ReprLt A B).
+Proof.
+  intros a A b B (j, H); revert H; destruct j.
+  intros (v1, (v2, (Hv1, (Hv2, (Hlt, H))))).
+  left; replace a with v1; [ replace b with v2; auto | idtac ].
+  inversion Hv2; auto.
+  inversion Hv1; auto.
+
+  intros (v1, (v2, (Hv1, (Hv2, (Hlt, H))))).
+  right.
+  assert (ListNth A j v1) as Hv1'; [inversion Hv1; auto | idtac].
+  assert (ListNth B j v2) as Hv2'; [inversion Hv2; auto | idtac].
+  rewrite (H 0 a b); try split; auto with arith; try constructor.
+  exists j; exists v1; exists v2; repeat split; auto.
+  intros i x y Hlt' Hx Hy; apply H with (S i); auto with arith;
+  constructor; auto.
+Qed.
+
+Lemma ReprGt_cons_inv :
+  forall a A b B, ReprGt (a::A) (b::B) -> a > b \/ (a = b /\ ReprGt A B).
+Proof.
+  unfold ReprGt; intros a A b B H.
+  elim (ReprLt_cons_inv H); intros; [left | right; inversion_clear H0]; auto; split; auto with arith.
+Qed.
+
+Lemma ReprLt_cons :
+  forall a A B, ReprLt A B -> ReprLt (a::A) (a::B).
+Proof.
+  intros a A B (i, (v1, (v2, (H1, (H2, (H3, H4)))))).
+  exists (S i); exists v1; exists v2; repeat split; try constructor; auto.
+  destruct i0 as [ | i']; intros x y H5 H6 H7.
+  inversion H6; inversion H7; omega.
+  apply H4 with i'; try omega; inversion H6; inversion H7; auto.
+Qed.
+
+Lemma ReprGt_cons :
+  forall a A B, ReprGt A B -> ReprGt (a::A) (a::B).
+Proof.
+  unfold ReprGt; intros; apply ReprLt_cons; auto.
+Qed.
+
+Lemma reprsum_gt_preserve :
+  forall A B D A' B', ReprGt A B -> ReprSum A' A D -> ReprSum B' B D -> ReprGt A' B'.
+Proof.
+  induction A.
+
+  destruct B.
+  intros D A' B' (j, (x, (y, (H1, (H2, H))))); inversion_on (ListNth nil j y).
+  intros D A' B' (j, (x, (y, (H1, (H2, H))))); inversion_on (ListNth nil j y).
+ 
+  destruct B as [ | b B].
+  intros D A' B' (j, (x, (y, (H1, (H2, H))))); inversion_on (ListNth nil j x).
+  destruct D as [ | d D]; [intros A' B' _ Hsum; inversion Hsum | idtac].
+  destruct A' as [ | a' A']; [intros A' B' Hsum; inversion Hsum | idtac].
+  destruct B' as [ | b' B']; [intros X' Y' Hsum; inversion Hsum | idtac].
+  intros Hgt HsumA HsumB.
+  assert (a'=a+d /\ ReprSum A' A D) as (Ha', HsumA').
+  inversion HsumA; auto.
+  assert (b'=b+d /\ ReprSum B' B D) as (Hb', HsumB').
+  inversion HsumB; auto.
+  destruct (ReprGt_cons_inv Hgt) as [Hab | (Hab1, Hab2)].
+  exists 0; exists b'; exists a'.
+  repeat split; auto; try constructor; auto; try omega.
+  intros i x y Habs; inversion Habs.
+
+  replace b' with a'; try omega.
+  apply ReprGt_cons; auto.
+  apply IHA with B D; auto.
+Qed.
+
+Lemma greedy_sum :
+  forall C V U D, ReprSum V U D -> Lexic_Gtest C V -> Lexic_Gtest C U.
+Proof.
+  intros C V U D H H0.
+  intros v Hr U' Hr'.
+  
+
+
+
+    
