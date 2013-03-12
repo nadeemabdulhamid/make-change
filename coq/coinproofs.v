@@ -1,9 +1,11 @@
 
-Require Import coinsystem.
+Require Import coinsystem tactics.
 Require Import List NPeano Bool.
 Require Import Omega.
 
 Set Implicit Arguments.
+
+Definition vect := list nat.
 
 Inductive ListNth A : list A -> nat -> A -> Prop :=
 | Nth_0 : forall a As, ListNth (a::As) 0 a
@@ -63,6 +65,7 @@ Definition Minimal C V
 
 Definition Canonical C
   := forall V, Lexic_Gtest C V <-> Minimal C V.
+
 
 (* ================================================================ *)
 
@@ -368,14 +371,15 @@ Lemma greedy_ReprGt :
                  -> (ReprGt (greedy C v) V) \/ (greedy C v = V).
 Proof.
   induction C.
+
+  Case "C = nil".
   simpl; intros; absurd (NotNil nil); auto.
 
-  (* C = nil *)
   rename a into c; intros v V Hnil Hdecr Hlast1.
   revert dependent C.
   intros C; case C; clear C.
 
-  (* 1 :: nil *)
+  Case "C = 1 :: nil".
   Focus 1.
   intros IHC Hnil Hdecr Hlast1 .
   replace c with 1; try symmetry; auto.
@@ -388,22 +392,33 @@ Proof.
   inversion_clear H; intros.
   replace v0 with v; auto; omega.
 
-  (* C = c' :: C' *)
+  Case "C = c :: c' :: C' (i.e. not last one)".
   intros c' C'.
-  remember (c' :: C') as C.
+  remember (c' :: C') as C. (* need this to show that NotNil C later when applying the IH *)
   intros IHC Hnil Hdecr Hlast1 Hrepr; simpl.
   assert (c <> 0) as Hc0.
   intros Habs; rewrite Habs in *; eapply DecrLast1_not0; eauto.
   inversion_clear Hrepr.
   rewrite <- H0.
   clear v H0.
+  (* So, V = v0 :: V0 where  reprValue C V0 = s  and  c*v0 <= v 
+      so v = c*v0 + s
+    Thus, greedy (c::C v) would produce  (c*v0+s) / c  as the number of the 
+    first coin. i.e. would pick  v0 + s / c as the number of the first coin -
+    now this is either greater than or equal to v0 - it depends if s is less than c 
+    or not. *)
 
   replace (c * v0) with (v0 * c); auto with arith.
   rewrite Nat.div_add_l; auto.
   replace (v0 * c + s) with (s + v0 * c); auto with arith.
   rewrite Nat.mod_add; auto.
 
-  assert (c <= s \/ s < c) as Hor; [omega | inversion_clear Hor].
+  (* now in the reference repr, V, either s (left-over portion after # of first coins)
+     is gt-or-equal the first coin value, or is less than.
+     In the first case, greedy would have then picked more of the first coin; in the 
+     second, greedy would pick the same number, and the property would hold by IH
+     on the rest *)
+  assert (c <= s \/ s < c) as Hor; [omega | inversion_clear Hor; [SCase "c <= s" | SCase "s < c"]].
   assert (0 < s / c) as Hsc; [ apply Nat.div_str_pos; omega | idtac ].
   left.
   unfold ReprGt, ReprLt.
@@ -420,6 +435,7 @@ Proof.
   rewrite HeqC in *; eapply LastIs1_rest; eauto.
   clear IHC.
 
+  SSCase "ReprGt (greedy C s) V0".
   Focus 1.
   intros (j, (v1, (v2, (HL1, (HL2, (Hv12, Hi)))))).
   left.
@@ -436,6 +452,7 @@ Proof.
   inversion Hl1; auto.
   inversion Hl2; auto.
   
+  SSCase "greedy C s = V0".
   intros Heq; rewrite Heq; right; auto.
 Qed.
 
@@ -519,11 +536,96 @@ Proof.
   apply IHA with B D; auto.
 Qed.
 
+
+(*
 Lemma greedy_sum :
   forall C V U D, ReprSum V U D -> Lexic_Gtest C V -> Lexic_Gtest C U.
 Proof.
   intros C V U D H H0.
   intros v Hr U' Hr'.
+  *)
+
+
+(* ================================================================ *)
+
+
+Lemma best_of_opt_aux1 :
+  forall (F:vect->vect->bool) V c b,
+    best_of F c V = b ->
+    (c = b \/ In b V).
+Proof.
+  induction V; auto; simpl; intros c b Hbest.
+  generalize (IHV _ _ Hbest); remember (F a c) as X; destruct X; intros IHbest.
+  right; elim IHbest; auto.
+  elim IHbest; auto.
+Qed.
+
+Lemma best_of_opt_aux2 :
+  forall (F:vect->vect->bool)
+         (Frefl:forall a, F a a = true)
+         (Ftrans:forall a b c, F a b = true -> F b c = true -> F a c = true)
+         V c b,
+    best_of F c V = b ->
+    F b c = true.
+Proof.
+  induction V as [ | v' V']; auto; simpl; intros c b Hbest.
+  rewrite Hbest; auto.
+  assert (F b (if F v' c then v' else c) = true); auto.
+  apply Ftrans with (if F v' c then v' else c); auto.
+  remember (F v' c) as b'; destruct b'; auto.
+Qed.
+
+Lemma best_of_opt :
+  forall (F:vect->vect->bool)
+         (Frefl:forall a, F a a = true)
+         (Ftrans:forall a b c, F a b = true -> F b c = true -> F a c = true)
+         (Fasym:forall a b, F a b = false -> F b a = true)
+         V c b,
+    best_of F c V = b ->
+    forall v, In v V -> F b v = true.
+Proof.
+  induction V as [ | v' V']; auto; simpl; intros c b Hbest.
+  elim (best_of_opt_aux1 _ _ _ Hbest); intros Hb;
+    intros v Hor; destruct Hor as [Hv | Hv].
+  rewrite Hv in *; clear v' Hv.
+  remember (F v c) as X; destruct X; [SCase "F v c = true" | SCase "F v c = false"];
+  rewrite Hb in *; auto.
+  apply IHV' with  (if F v' c then v' else c); auto.
+  
+  rewrite Hv in *; clear v' Hv.
+  assert (F b  (if F v c then v else c) = true); auto.
+  apply best_of_opt_aux2 with V'; auto.
+  remember (F v c) as b'; destruct b'; auto.
+  assert (F c v = true); [ apply Fasym; symmetry; auto | apply Ftrans with c; auto].
+  apply IHV' with (if F v' c then v' else c); auto.
+Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Lemma eq_vect_dec : forall (V V':vect), {V = V'} + {V <> V'}.
+Proof.
+  induction V as [ | v V]; destruct V' as [ | v' V']; auto; try (right; discriminate).
+  elim (IHV V'); intros HeqV'; auto.
+  compare v v'; intros Heqv'; auto.
+  rewrite HeqV'; rewrite Heqv'; left; auto.
+  right; rewrite HeqV'.
+  intro Habs; inversion Habs; absurd (v = v'); auto.
+  right; intro Habs; inversion Habs; absurd (v = v'); auto.
+Qed.
+
+Lemma canonical_or_not : forall C, Canonical C \/ ~Canonical C.
+Proof.
+  intros C; unfold Canonical, Lexic_Gtest, Minimal.
   
 
 
