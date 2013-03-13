@@ -16,30 +16,28 @@ Eval compute in (min 8 4).
 
 
 
-
-
-(*
-Fixpoint min_num_coins (n : nat) (vals : list nat) : nat :=
+Fixpoint min_num_coins (n : nat) (m : nat) (vals : list nat) : nat :=
   match n with
     | 0 => 0
-    | S n' => let fix make_change_choices (vals0 : list nat) (n0 : nat) : nat :=
+    | S n' => let fix make_change_choices (vals0 : list nat) (m0 : nat) : nat :=
                   match vals0 with
                     | nil => 1000
-                    | val :: vals' => let fix try_choice (n1 : nat) (val0: nat) : nat :=
-                                          match n1 with 
-                                            | 0 => 1000
-                                            | S n2 => match val0 with
-                                                        | 0 => (min_num_coins (n0 - val) vals)
-                                                        | S val1 => (try_choice n2 val1)
+                    | val :: vals' => let fix try_choice (m1 : nat) (val0: nat) : nat :=
+                                          match val0 with 
+                                            | 0 => (min_num_coins n' (m0 - val) vals)
+                                            | S val1 => match m1 with
+                                                        | 0 => 1000
+                                                        | S m2 => (try_choice m2 val1)
                                                       end
                                           end
-                                      in (min (try_choice n0 val)
-                                              (make_change_choices vals' n))
+                                      in (min (try_choice m0 val)
+                                              (make_change_choices vals' m0))
                   end
               in
-                (S (make_change_choices vals n'))
+                (S (make_change_choices vals m))
   end.
-*)
+
+Eval compute in (min_num_coins 16 16 (10 :: 8 :: 5 :: 1 :: nil)).
 
 
 (*Fixpoint min_num_coins (n : nat) (vals : list nat) : nat :=
