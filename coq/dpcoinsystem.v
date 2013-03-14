@@ -19,7 +19,11 @@ Eval compute in (min 8 4).
 Fixpoint min_num_coins (n : nat) (m : nat) (vals : list nat) : nat :=
   match n with
     | 0 => 0
-    | S n' => let fix make_change_choices (vals0 : list nat) (m0 : nat) : nat :=
+    | S n' => 
+             match m with
+                | 0 => 0
+                | S m' => 
+                  let fix make_change_choices (vals0 : list nat) (m0 : nat) : nat :=
                   match vals0 with
                     | nil => 1000
                     | val :: vals' => let fix try_choice (m1 : nat) (val0: nat) : nat :=
