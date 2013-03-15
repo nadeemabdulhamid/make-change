@@ -37,8 +37,9 @@ Fixpoint min_num_coins (n : nat) (m : nat) (vals : list nat) : nat :=
                                       in (min (try_choice m0 val)
                                               (make_change_choices vals' m0))
                   end
-              in
-                (S (make_change_choices vals m))
+                  in
+                    (S (make_change_choices vals m))
+                end
   end.
 
 Eval compute in (min_num_coins 16 16 (10 :: 8 :: 5 :: 1 :: nil)).
