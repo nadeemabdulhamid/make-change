@@ -61,7 +61,9 @@ Definition Lexic_Gtest C V
 
 Definition Minimal C V
   := forall v s, ReprValue C V v -> ReprSize V s
-                 -> forall V' s', ReprValue C V' v -> ReprSize V' s' -> s <= s'.
+                 -> forall V' s', ReprValue C V' v -> ReprSize V' s' ->
+                                  (s < s'
+                                   \/ (s = s' /\ (ReprGt V V' \/ V = V'))).
 
 Definition Canonical C
   := forall V, Lexic_Gtest C V <-> Minimal C V.
@@ -546,6 +548,175 @@ Proof.
   *)
 
 
+
+(* ================================================================ *)
+
+
+Theorem all_reprs_correct : 
+  forall C amt Vs, amt > 0 -> DecreasingOrder C -> LastIs1 C -> all_reprs C amt = Vs ->
+                forall V, ReprValue C V amt -> In V Vs.
+Proof.
+  induction C as [ | c C]; auto.
+  simpl; intros amt V H H0 Hdec Hlast v H1;
+    inversion H1; replace amt with 0 in H; auto; inversion H.
+  
+  intros amt Vs Hamt Hdec Hlast Hall V Hrv.
+  assert (exists v', exists V', exists s,
+                                  V = v' :: V' /\ amt = c * v' + s /\ ReprValue C V' s)
+         as (v', (V', (s, (H1, (H2, H3))))).
+  inversion Hrv; exists v; exists V0; exists s; repeat split; auto.
+  rewrite H1 in *; clear V H1.
+  assert (s = amt - c * v'); auto with arith.
+  
+  destruct C as [ | c' C'].
+  simpl in Hall.
+  rewrite <- Hall; constructor.
+  inversion Hrv.
+  inversion H7.  
+  rewrite H2 in H8.
+  assert (s0 = s); try omega.
+  assert (amt = c * v'); try omega.
+  inversion Hlast.
+  rewrite H13 in H12; rewrite H12.
+  replace (1 * v') with v'; auto with arith.
+
+  unfold all_reprs in Hall; fold all_reprs in Hall.
+  assert (
+          (* all_reprs_iterate all_reprs C' c v *)
+          (fix all_reprs_iterate (X : list nat) : list repr :=
+             match X with
+               | nil => nil
+               | x :: X' =>
+                 (* x .. c *)
+                 app
+                   (cons_each x (all_reprs (c'::C') (amt - (c * x))))
+                   (all_reprs_iterate X')
+             end)
+            (range (S (amt / c))) = Vs); auto.
+  clear Hall; rename H0 into Hall.
+  assert (In V' (all_reprs (c'::C') (amt - c * v'))).
+  assert (s = 0 \/ s > 0); try omega.
+  destruct H0.
+  Focus 2.
+  apply IHC with (amt - c * v'); try rewrite <- H; auto;
+  try (eapply LastIs1_rest; eauto); try (eapply DecreasingOrder_rest; eauto).
+  rewrite H0 in *; clear s H0.
+  rewrite <- H in *.
+  (* ... *)
+  Focus 2.
+
+  assert (v' <= (amt / c)).
+    assert (amt >= c * v'); try omega.  
+    apply Nat.div_le_lower_bound; auto.
+    intros Hc.
+    rewrite Hc in *; apply DecrLast1_not0 with (c'::C'); auto.
+
+  assert
+    (forall X x C V' Vs, 
+       In x X ->
+       In V' (all_reprs C (amt - c * x)) ->
+       (fix all_reprs_iterate (X : list nat) : list repr :=
+          match X with
+            | nil => nil
+            | x :: X' =>
+              cons_each x (all_reprs C (amt - c * x)) ++
+                        all_reprs_iterate X'
+          end) X = Vs
+      -> In (x::V') Vs).
+  Focus 2.
+  eapply H4; eauto.
+
+  
+
+Lemma range_in : forall a r, a <= r -> In a (range (S r)).
+Proof.  
+  induction r; simpl; auto;
+  intros Hlt; inversion Hlt; auto.
+  right; apply IHr; auto.
+Qed.
+
+  apply range_in; auto.
+  clear .
+  induction X as [ | x' X'].
+  intros x C V' Vs Hin; inversion Hin.
+  intros x C V' Vs Hx Hin Hrest.
+  rewrite <- Hrest; apply in_or_app.
+  destruct Hx; [left | right].
+  
+Lemma cons_each_in : 
+  forall Vs x V, In V Vs -> In (x :: V) (cons_each x Vs).
+Proof.
+  induction Vs as [ | V' Vs']; auto.
+  intros x V Hin.
+  destruct Hin; simpl.
+  left; rewrite H; auto.
+  right; auto.
+Qed.
+
+  rewrite H; apply cons_each_in; auto.
+  eapply IHX'; eauto.
+
+Lemma all_reprs_0_correct : 
+  forall C c V, DecreasingOrder (c::C) -> LastIs1 (c::C) -> 
+                ReprValue (c::C) V 0 -> In V (all_reprs (c::C) 0).
+Proof.
+  induction C as [ | c' C'].
+  intros c V Hdec Hlast Hr; inversion Hr.
+  left.
+  inversion H1.
+  replace v with 0; auto with arith.
+  rewrite <- H7 in H4.
+  inversion Hlast.
+  assert (c*v = 0); try omega.
+  rewrite H5 in H10; omega.
+
+  intros c V Hdec Hlast Hr.
+  inversion_clear Hr.
+  assert (In V0 (all_reprs (c'::C') 0)); auto.
+  apply IHC'; auto.
+  eapply DecreasingOrder_rest; eauto.
+  eapply LastIs1_rest; eauto.
+  replace 0 with s; auto.
+  generalize (plus_is_O _ _ H0); intros (H7, H8); auto.
+  assert (v = 0); auto.
+    elim (plus_is_O _ _ H0); intros; auto.
+    destruct c as [ | c].
+    elim (DecrLast1_not0 Hdec Hlast).
+    elim (mult_is_O _ _ H2); intros; auto.
+    discriminate H4.
+  replace v with 0; auto.
+  change (In (0 :: V0)
+             ((fix all_reprs_iterate (X : list nat) : list repr :=
+                      match X with
+                        | nil => nil
+                        | x :: X' =>
+                          (* x .. c *)
+                          app
+                            (cons_each x (all_reprs (c'::C') (0 - (c * x))))
+                            (all_reprs_iterate X')
+                      end)
+                     (range (S (0 / c))))).
+  rewrite Nat.div_0_l.
+  unfold range.
+  replace (0 - c * 0) with 0; auto.
+  rewrite app_nil_r.
+  apply cons_each_in.
+  auto.
+  intro Heq; rewrite Heq in *; apply DecrLast1_not0 with (c'::C'); auto.
+Qed.
+
+  apply all_reprs_0_correct; auto.
+  eapply DecreasingOrder_rest; eauto.
+  eapply LastIs1_rest; eauto.
+Qed.
+
+
+
+
+
+
+
+
 (* ================================================================ *)
 
 
@@ -575,7 +746,7 @@ Proof.
   remember (F v' c) as b'; destruct b'; auto.
 Qed.
 
-Lemma best_of_opt :
+Theorem best_of_opt :
   forall (F:vect->vect->bool)
          (Frefl:forall a, F a a = true)
          (Ftrans:forall a b c, F a b = true -> F b c = true -> F a c = true)
@@ -600,10 +771,113 @@ Proof.
   apply IHV' with (if F v' c then v' else c); auto.
 Qed.
 
+Lemma ltb_not_refl : forall a, a <? a = false.
+Proof.
+  induction a; auto.
+Qed.
 
+Lemma ltb_false_ge : forall a b, a <? b = false -> b <= a.
+Proof.
+  induction a; destruct b; simpl; auto with arith.
+  assert (0 < S b) by auto with arith.
+  assert (0 <? S b = true) by (apply ltb_lt; auto).
+  rewrite H0; intros Habs; inversion Habs.
+Qed.
 
+Lemma repr_le_refl : forall a, repr_le a a = true.
+Proof.
+  induction a; simpl; try rewrite ltb_not_refl; simpl; auto.
+  rewrite <- beq_nat_refl; auto.
+Qed.
 
+Ltac reflectBs :=
+  repeat
+    match goal with
+      | H : ?X || ?Y = false |- _ =>
+       let H1 := fresh "L"
+        with H2 := fresh "L"
+        in generalize (orb_false_iff X Y); intros (?H1, _); 
+           generalize (H1 H); clear H H1; intros (?H1, ?H2)
+      | H : ?X || ?Y = true |- _ => 
+        let H1 := fresh "L"
+        with H2 := fresh "L"
+        in generalize (orb_true_iff X Y); intros (?H1, _); 
+           generalize (H1 H); clear H H1; intros H1; destruct H1 as [H1 | H2]
+      | H : ?X && ?Y = false |- _ => 
+        let H1 := fresh "L"
+        with H2 := fresh "L"
+        in generalize (andb_false_iff X Y); intros (?H1, _); 
+           generalize (H1 H); clear H H1; intros H1; destruct H1 as [H1 | H2]
+      | H : ?X && ?Y = true |- _ =>
+        let H1 := fresh "A"
+        with H2 := fresh "A"
+        in generalize (andb_true_iff X Y); intros (H1, _); generalize (H1 H);
+           clear H; intros (?H1, ?H2)
+      | H : beq_nat ?A ?B = true |- _ => assert (A = B) as Heq by (apply beq_nat_eq; auto);
+                                   clear H; rewrite Heq in *; clear Heq
+      | H : beq_nat ?A ?B = false |- _ => assert (A <> B) by (apply beq_nat_false; auto);
+                                         clear H
+      | H : ?A <? ?B = false |- _ => assert (B <= A) by (apply ltb_false_ge; auto with arith);
+                                    clear H
+      | H : ?A <? ?B = true |- _ => assert (A < B) by (apply ltb_lt; auto with arith);
+                                   clear H
+      | |- ?A <? ?B = true => apply ltb_lt; auto with arith
+      | |- ?A || ?B = true => apply orb_true_iff; auto
+      | |- ?A && ?B = true => apply andb_true_iff; split; auto
+      | |- beq_nat ?A ?B = true => symmetry; apply beq_nat_refl
+  end; auto.
 
+Lemma repr_le_asym : forall a b, repr_le a b = false -> repr_le b a = true.
+Proof.
+  induction a as [ | a']; destruct b as [ | b']; simpl; auto.
+  intros H.
+  reflectBs.
+  inversion H0; auto with arith; left; reflectBs.
+  inversion H.
+  right; reflectBs.
+  left; reflectBs.
+Qed.
+
+Lemma repr_ge_asym : forall a b, repr_ge a b = false -> repr_ge b a = true.
+Proof.
+  induction a as [ | a']; destruct b as [ | b']; simpl; auto.
+  intros H.
+  reflectBs.
+  inversion H0; auto with arith; left; reflectBs.
+  inversion H.
+  right; reflectBs.
+  left; reflectBs.
+Qed.
+
+Lemma repr_le_trans : 
+  forall a b c, repr_le a b = true -> repr_le b c = true -> repr_le a c = true.
+Proof.
+  induction a as [ | a']; simpl; auto;
+    intros b c Hle1 Hle2.
+  destruct b as [ | b']; simpl; auto; inversion Hle1; 
+    destruct c as [ | c']; simpl in *; auto.
+  destruct b as [ | b']; simpl; auto; [ inversion Hle1 | idtac ];
+    destruct c as [ | c']; simpl in *; auto.
+  reflectBs.
+  left; reflectBs; eauto with arith.
+  left; reflectBs.  
+  left; reflectBs.
+  right; reflectBs.
+  apply IHa with b; auto.
+Qed.
+
+Lemma greedy_bf_aux1 :
+  forall v Vs x,
+    In v Vs ->
+    best_of repr_ge v Vs = x ->
+    forall v', In v' Vs -> repr_ge x v' = true.
+Proof.
+  intros v Vs x Hin Hbest v' Hin'.
+  apply best_of_opt with Vs v; auto.
+  apply repr_le_refl.
+  intros; apply repr_le_trans with b; auto.
+  apply repr_ge_asym.
+Qed.
 
 
 

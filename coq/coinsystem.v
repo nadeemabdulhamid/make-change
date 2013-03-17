@@ -56,12 +56,26 @@ Fixpoint repr_lt (U V : repr) : bool :=
     | nil, nil => false
     | u :: U', v :: V' => 
       orb (ltb u v) (andb (beq_nat u v) (repr_lt U' V'))
-    | _, _ => false
+    | nil, _ => true
+    | _, nil => false
+  end.
+
+Fixpoint repr_le (U V : repr) : bool :=
+  match U, V with
+    | nil, nil => true
+    | u :: U', v :: V' => 
+      orb (ltb u v) (andb (beq_nat u v) (repr_le U' V'))
+    | nil, _ => true
+    | _, nil => false
   end.
 
 Definition repr_gt (U V : repr) : bool := repr_lt V U.
+Definition repr_ge (U V : repr) : bool := repr_le V U.
 
 Eval compute in (repr_lt (1 :: 1 :: 0 ::  3 :: nil) (1 :: 3 :: 0 :: 0 :: nil)).
+Eval compute in (repr_lt (1 :: 1 :: 0 ::  3 :: nil) (1 :: 1 :: 0 :: 3 :: nil)).
+Eval compute in (repr_le (1 :: 1 :: 0 ::  3 :: nil) (1 :: 1 :: 0 :: 3 :: nil)).
+Eval compute in (repr_le (1 :: 1 :: 0 ::  3 :: nil) (1 :: 3 :: 0 :: 0 :: nil)).
 Eval compute in negb (repr_lt (1 :: 1 :: nil) (1 :: 1 :: nil)).
 Eval compute in negb (repr_lt (3 :: 1 :: nil) (1 :: 1 :: nil)).
 
@@ -102,29 +116,45 @@ Fixpoint cons_each (x:nat) (V:list repr) :=
     | v :: V' => (cons x v) :: cons_each x V'
   end.
 
+Fixpoint all_reprs_iterate
+         (all_reprs : coinlist -> nat -> list repr) (C':coinlist) (c:nat) (v:nat) (X : list nat) : list repr :=
+  match X with
+    | nil => nil
+    | x :: X' =>
+      (* x .. c *)
+      app
+        (cons_each x (all_reprs C' (v - (x * c))))
+        (all_reprs_iterate all_reprs C' c v X')
+  end.
+
 Fixpoint all_reprs (C : coinlist) (v : nat) {struct C} : list repr :=
   match C with
       | nil => nil
       | c :: nil => (v :: nil) :: nil
       | c :: C' => let max_of_c := v / c in
                    let count_of_c_opts := range (S max_of_c) in
+                   (* all_reprs_iterate all_reprs C' c v *)
                    (fix all_reprs_iterate (X : list nat) : list repr :=
                       match X with
                         | nil => nil
                         | x :: X' =>
                           (* x .. c *)
                           app
-                            (cons_each x (all_reprs C' (v - (x * c))))
+                            (cons_each x (all_reprs C' (v - (c * x))))
                             (all_reprs_iterate X')
-                      end) count_of_c_opts
+                      end)
+                     count_of_c_opts
   end.
 
 Eval compute in (all_reprs C 17).
 
+(* new is "more [or equally] minimal" than cur if:
+     - size(new) < size(cur), or
+     - size(new)=size(cur) and cur <= new  [lexic. less than] *)
 Definition more_minimal (new : repr) (cur : repr) : bool :=
   orb (ltb (repr_size new) (repr_size cur))
       (andb (beq_nat (repr_size new) (repr_size cur))
-            (repr_lt cur new)).
+            (repr_le cur new)).
 
 Fixpoint make_repr_all_ones (n:nat) (v:nat) : repr :=
   match n with
@@ -135,7 +165,7 @@ Fixpoint make_repr_all_ones (n:nat) (v:nat) : repr :=
 
 (* brute force computations of the minimal and greedy representations *)
 Definition minimal_bf C v := best_of more_minimal (make_repr_all_ones (length C) v) (all_reprs C v).
-Definition greedy_bf C v :=  best_of repr_gt  (make_repr_all_ones (length C) v) (all_reprs C v).
+Definition greedy_bf C v :=  best_of repr_ge (make_repr_all_ones (length C) v) (all_reprs C v).
 
 Fixpoint greedy (C:coinlist) (v:nat) : repr :=
   match C with
