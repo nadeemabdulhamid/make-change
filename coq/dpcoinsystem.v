@@ -45,6 +45,9 @@ Fixpoint min_num_coins (n : nat) (m : nat) (vals : list nat) : nat :=
 Eval compute in (min_num_coins 16 16 (10 :: 8 :: 5 :: 1 :: nil)).
 
 
+
+
+
 (*Fixpoint min_num_coins (n : nat) (vals : list nat) : nat :=
   match n with
     | 0 => 0
