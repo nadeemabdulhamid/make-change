@@ -3,53 +3,60 @@ Require Import List.
 Require Import NPeano EqNat Compare_dec.
 
 
-Fixpoint min (n : nat) (m : nat) : option nat :=
+Fixpoint min (n : nat) (m : nat) : nat :=
   match n with
-      | 0 => Some 0
-      | (S n') => match m with
-                         | 0 => Some 0
-                         | (S m') => Some (S (min n' m'))
-                       end
+      | 0 => 0
+      | (S n') => 
+          match m with
+            | 0 => 0
+            | (S m') => (S (min n' m'))
+          end
   end.
 
 Eval compute in (min 8 4).
 
-
+Definition some_to_num (n : option nat) : nat :=
+  match n with
+      | None => 0
+      | Some n => n
+end.
 
 Fixpoint min_num_coins (b : nat) (m : nat) (vals : list nat) : option nat :=
   match b with
     | 0 => Some 0
     | S n' => 
-             match m with
-                | 0 => Some 0
-                | S m' => 
-                  let fix make_change_choices (vals0 : list nat) (m0 : nat) : option nat :=
+        match m with
+          | 0 => Some 0
+          | S m' => 
+              let fix make_change_choices (vals0 : list nat) (m0 : nat) : option nat :=
                   match vals0 with
                     | nil => None
-                    | val :: vals' => let fix try_choice (m1 : nat) (val0: nat) : option nat :=
-                                          match val0 with 
-                                            | 0 => (min_num_coins n' (m0 - val) vals)
-                                            | S val1 => match m1 with
-                                                        | 0 => None
-                                                        | S m2 => (try_choice m2 val1)
-                                                      end
-                                          end
-                                      in match (make_change_choices vals' m0) with
-                                           | None => 
-                                               match (try_choice m0 val) with
-                                                   | None => Some 0
-                                                   | Some n0 => Some n0
-                                                 end
-                                           | Some n1 => 
-                                               match (try_choice m0 val) with
-                                                 | None => Some 0
-                                                 | Some n2 => (min n1 n2)
-                                               end
-                                         end
+                    | val :: vals' => 
+                        let fix try_choice (m1 : nat) (val0: nat) : option nat :=
+                            match val0 with 
+                              | 0 => (min_num_coins n' (m0 - val) vals)
+                              | S val1 => 
+                                  match m1 with
+                                    | 0 => None
+                                    | S m2 => (try_choice m2 val1)
+                                  end
+                            end
+                        in match (make_change_choices vals' m0) with
+                             | None => 
+                                 match (try_choice m0 val) with
+                                   | None => None
+                                   | Some n0 => Some n0
+                                 end
+                             | Some n1 => 
+                                 match (try_choice m0 val) with
+                                   | None => None
+                                   | Some n2 => Some (min n1 n2)
+                                 end
+                           end
                   end
-                  in
-                    (S (make_change_choices vals m))
-                end
+              in
+                Some (S (some_to_num (make_change_choices vals m)))
+        end
   end.
 
 Eval compute in (min_num_coins 16 16 (10 :: 8 :: 5 :: 1 :: nil)).
